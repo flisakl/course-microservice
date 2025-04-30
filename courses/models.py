@@ -9,6 +9,9 @@ class Course(models.Model):
         validators=[MinValueValidator(1)]
     )
 
+    def __str__(self):
+        return self.name
+
 
 class Access(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
@@ -34,6 +37,12 @@ class Lesson(models.Model):
     video = models.FileField('lesson-videos/', null=True, blank=True)
 
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
+    quiz_id = models.PositiveBigIntegerField(
+        validators=[MinValueValidator(1)], null=True, blank=True
+    )
+
+    def __str__(self):
+        return self.name
 
     class Meta:
         ordering = ['number']
