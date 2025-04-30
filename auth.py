@@ -23,3 +23,10 @@ class AuthBearer(HttpBearer):
                 raise AuthenticationError(401, "Token has expired")
             except jwt.exceptions.DecodeError:
                 raise AuthenticationError(401, "Invalid token")
+
+
+class AuthInstructor(AuthBearer):
+    def authenticate(self, request, token):
+        decoded = super().authenticate(request, token)
+        if decoded and decoded['is_instructor']:
+            return decoded
