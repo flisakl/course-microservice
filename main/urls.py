@@ -3,9 +3,10 @@ from django.urls import path
 from ninja import NinjaAPI
 
 from jwt.exceptions import ExpiredSignatureError
+from courses.router import router
 
 api = NinjaAPI()
-# api.add_router('/', router)
+api.add_router('/', router)
 
 
 @api.exception_handler(ExpiredSignatureError)
