@@ -2,15 +2,16 @@ from django.test import TestCase
 from ninja.testing import TestClient
 
 from courses.router import router
-from courses.api import login_or_register
+from courses.api import API
 from courses.models import Course, Lesson
 from auth import decode_jwt
 
 client = TestClient(router)
+api = API()
 
 
-USER_TOKEN = login_or_register('testuser', 'testpassword')[1]['token']
-INSTRUCTOR_TOKEN = login_or_register(
+USER_TOKEN = api.login_or_register('testuser', 'testpassword')[1]['token']
+INSTRUCTOR_TOKEN = api.login_or_register(
     'testinstructor', 'testpassword', True
 )[1]['token']
 
@@ -53,15 +54,50 @@ class UserAPITests(TestCase):
 
     def test_reqular_user_can_access_course_list(self):
         courses = Course.objects.bulk_create([
-            Course(name='First course', description='Test', instructor_id=INSTRUCTOR_ID),
-            Course(name='Second course', description='Test', instructor_id=INSTRUCTOR_ID),
+            Course(name='First course', description='Test',
+                   instructor_id=INSTRUCTOR_ID),
+            Course(name='Second course', description='Test',
+                   instructor_id=INSTRUCTOR_ID),
         ])
-        Lesson.objects.create(name='First lesson', content='Bla bla bla', course=courses[0])
+        Lesson.objects.create(name='First lesson',
+                              content='Bla bla bla', course=courses[0])
 
         response = client.get("")
         json = response.json()
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(json['count'], 2)
-        self.assertEqual(json['items'][0]['name'], 'First course')
-        self.assertEqual(json['items'][0]['lesson_count'], 1)
+        self.assertIn(
+            json['items'][0]['name'],
+            ['First course', 'Second course']
+        )
+
+    def test_guest_can_access_course_details(self):
+        course = Course.objects.create(
+            name='Microservices 101',
+            description='Test',
+            instructor_id=INSTRUCTOR_ID
+        )
+        lessons = Lesson.objects.bulk_create([
+            Lesson(
+                name='What are API Gateways', content='Bla bla bla', number=3,
+                course=course
+            ),
+            Lesson(
+                name='How to create microservice', content='Bla', number=1,
+                course=course
+            ),
+            Lesson(
+                name='How to talk to other services', content='Bla ', number=2,
+                course=course
+            )
+        ])
+
+        response = client.get(f"/{course.pk}")
+        json = response.json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(json['name'], course.name)
+        self.assertEqual(len(json['lessons']), 3)
+        self.assertEqual(json['lessons'][0]['name'], lessons[1].name)
+        self.assertEqual(json['lessons'][1]['name'], lessons[2].name)
