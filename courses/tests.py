@@ -101,3 +101,28 @@ class UserAPITests(TestCase):
         self.assertEqual(len(json['lessons']), 3)
         self.assertEqual(json['lessons'][0]['name'], lessons[1].name)
         self.assertEqual(json['lessons'][1]['name'], lessons[2].name)
+
+    def test_instructor_can_edit_his_course(self):
+        course = Course.objects.create(name='Bad name', description='Bad description', instructor_id=INSTRUCTOR_ID)
+        data = {'name': 'Good name', 'description': 'Good description'}
+        url = f"/{course.pk}"
+
+        response = client.put(url, json=data, headers=self.auth_header(INSTRUCTOR_TOKEN))
+        response2 = client.put(url, json=data, headers=self.auth_header(USER_TOKEN))
+        json = response.json()
+
+        self.assertEqual(response2.status_code, 401)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(json['name'], data['name'])
+        self.assertEqual(json['description'], data['description'])
+
+    def test_instructor_can_delete_his_course(self):
+        course = Course.objects.create(name='Bad name', description='Bad description', instructor_id=INSTRUCTOR_ID)
+        url = f"/{course.pk}"
+
+        response = client.delete(url, headers=self.auth_header(INSTRUCTOR_TOKEN))
+        response2 = client.delete(url, headers=self.auth_header(USER_TOKEN))
+
+        self.assertEqual(response2.status_code, 401)
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Course.objects.filter(pk=course.pk).exists())
