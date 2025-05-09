@@ -83,10 +83,8 @@ def create_lesson(request, courseID: int, data: Form[schemas.LessonSchemaIn], vi
     return 201, obj
 
 
-@router.get("/{int:courseID}/lessons", response=list[schemas.LessonSchema], auth=AuthBearer())
+@router.get("/{int:courseID}/lessons", response=list[schemas.LessonSchema], auth=None)
 def get_course_lessons(request, courseID: int):
-    get_object_or_404(models.Access, course_id=courseID,
-                      user_id=request.auth['id'])
     objs = models.Lesson.objects.filter(course_id=courseID).order_by('number')
     return objs
 
