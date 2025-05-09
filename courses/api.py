@@ -17,6 +17,15 @@ class API:
         )
         return response.status_code, response.json()
 
+    def get_users(self, user_ids: list[int]):
+        response = requests.get(
+            f'{self.URLS["users"]}',
+            params={
+                'ids': user_ids
+            }
+        )
+        return response.status_code, response.json()
+
     def create_user(
             self,
             username: str,

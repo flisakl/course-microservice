@@ -72,3 +72,10 @@ class Lesson(models.Model):
 
     class Meta:
         ordering = ['number']
+
+
+class JoinRequest(models.Model):
+    user_id = models.PositiveBigIntegerField(
+        validators=[MinValueValidator(1)]
+    )
+    course = models.ForeignKey(Course, on_delete=models.CASCADE)

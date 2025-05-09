@@ -50,13 +50,13 @@ class LessonSchemaFull(LessonSchema):
     quiz_id: int | None
 
 
-class InstructorSchema(Schema):
+class UserSchema(Schema):
     id: int
     username: str
 
 
 class CourseSchemaFull(ModelSchema):
-    instructor: InstructorSchema | None = None
+    instructor: dict | None = None
     lessons: list[LessonSchema] = Field([], alias='lesson_set')
 
     class Meta:
@@ -66,3 +66,18 @@ class CourseSchemaFull(ModelSchema):
 
 class CodeSchema(Schema):
     code: str
+
+
+class RequestSchema(Schema):
+    id: int
+    course: CourseSchema
+    user: dict
+
+
+class RequestAnswer(Schema):
+    id: int
+    accept: bool = False
+
+
+class RequestAnswerSchema(Schema):
+    requests: list[RequestAnswer] = []

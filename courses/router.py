@@ -59,7 +59,7 @@ def delete_course(request, courseID: int):
 
 
 @router.post("/join", response={200: dict}, auth=AuthBearer())
-def join_course(request, data   : schemas.CodeSchema):
+def join_course(request, data: schemas.CodeSchema):
     obj = get_object_or_404(models.Course, code=data.code)
     obj, created = models.Access.objects.get_or_create(
         course=obj, user_id=request.auth['id'])
@@ -121,4 +121,48 @@ def delete_lesson(request, courseID: int, lessonID: int):
                       instructor_id=request.auth['id'])
     obj = get_object_or_404(models.Lesson, pk=lessonID)
     obj.delete()
+    return 204, None
+
+
+@router.get("/{int:courseID}/requests", response=list[schemas.RequestSchema], auth=AuthInstructor())
+def get_join_requests(request, courseID: int):
+    get_object_or_404(models.Course, pk=courseID,
+                      instructor_id=request.auth['id'])
+    requests = models.JoinRequest.objects.filter(course_id=courseID)
+
+    user_ids = [x.user_id for x in requests]
+    code, users = api.get_users(user_ids)
+    for r in requests:
+        for u in users:
+            if r.user_id == u['id']:
+                r.user = u
+
+    return requests
+
+
+@router.post("/{int:courseID}/requests", response={200: dict, 201: dict}, auth=AuthBearer())
+def send_join_request(request, courseID: int):
+    obj = get_object_or_404(models.Course, pk=courseID)
+    obj, created = models.JoinRequest.objects.get_or_create(course=obj, user_id=request.auth['id'])
+
+    if not created:
+        return 200, {'detail': "You've already send the request, wait for response."}
+    else:
+        return 201, {'detail': "Response has been sent"}
+
+
+@router.post("/{int:courseID}/requests/answer", response={204: None})
+def answer_course_join_requests(request, courseID: int, data: schemas.RequestAnswerSchema):
+    course = get_object_or_404(models.Course, pk=courseID, instructor_id=request.auth['id'])
+    requests = models.JoinRequest.objects.filter(pk__in=[x.id for x in data.requests], course_id=course.pk)
+    new_access_objs = []
+
+    for obj in requests:
+        for rd in data.requests:
+            if obj.pk == rd.id and rd.accept is True:
+                new_access_objs.append(models.Access(user_id=obj.user_id, course=course))
+
+    requests.delete()
+    models.Access.objects.bulk_create(new_access_objs)
+
     return 204, None

@@ -3,7 +3,7 @@ from ninja.testing import TestClient
 
 from courses.router import router
 from courses.api import API
-from courses.models import Course, Lesson, Access
+from courses.models import Course, Lesson, Access, JoinRequest
 from auth import decode_jwt
 
 client = TestClient(router)
@@ -235,3 +235,76 @@ class UserAPITests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response2.status_code, 404)
+
+    def test_user_can_send_join_request(self):
+        course = Course.objects.create(
+            name='Bad name', description='Bad description', instructor_id=INSTRUCTOR_ID)
+        url = f"/{course.pk}/requests"
+        h = self.auth_header(USER_TOKEN)
+
+        response = client.post(url, headers=h)
+        response2 = client.post(url, headers=h)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response2.status_code, 200)
+
+    def test_instructor_can_access_join_request_for_his_course(self):
+        course = Course.objects.create(
+            name='Bad name', description='Bad description', instructor_id=INSTRUCTOR_ID)
+        course2 = Course.objects.create(
+            name='Bad name', description='Bad description', instructor_id=INSTRUCTOR_ID+1)
+        url = f"/{course.pk}/requests"
+        url2 = f"/{course2.pk}/requests"
+        JoinRequest.objects.bulk_create(
+            [
+                JoinRequest(course=course, user_id=USER_ID),
+                JoinRequest(course=course, user_id=USER_ID + 1),
+                JoinRequest(course=course2, user_id=USER_ID),
+            ]
+        )
+        h = self.auth_header(INSTRUCTOR_TOKEN)
+
+        response = client.get(url, headers=h)
+        response2 = client.get(url2, headers=h)
+        json = response.json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response2.status_code, 404)
+        self.assertEqual(len(json), 2)
+
+    def test_instructor_can_accept_join_requests_for_his_course(self):
+        course = Course.objects.create(
+            name='Bad name', description='Bad description', instructor_id=INSTRUCTOR_ID)
+        course2 = Course.objects.create(
+            name='Bad name', description='Bad description', instructor_id=INSTRUCTOR_ID+1)
+        requests = JoinRequest.objects.bulk_create(
+            [
+                JoinRequest(course=course, user_id=USER_ID),
+                JoinRequest(course=course, user_id=USER_ID + 1),
+                JoinRequest(course=course2, user_id=USER_ID + 1),
+                JoinRequest(course=course2, user_id=USER_ID),
+            ]
+        )
+        data = {
+            "requests": [
+                {"id": requests[0].pk, "accept": True},
+                {"id": requests[1].pk, "accept": False},
+                {"id": requests[2].pk, "accept": True},
+                {"id": requests[3].pk, "accept": False},
+            ]
+        }
+        url = f"/{course.pk}/requests/answer"
+        url2 = f"/{course2.pk}/requests/answer"
+        h = self.auth_header(INSTRUCTOR_TOKEN)
+
+        response = client.post(url, json=data, headers=h)
+        response2 = client.post(url2, json=data, headers=h)
+
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(response2.status_code, 404)
+        self.assertEqual(
+            len(JoinRequest.objects.filter(course_id=course.pk)), 0)
+        self.assertEqual(
+            len(Access.objects.filter(course_id=course.pk)), 1)
+        self.assertEqual(
+            len(JoinRequest.objects.filter(course_id=course2.pk)), 2)
