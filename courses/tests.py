@@ -221,3 +221,17 @@ class UserAPITests(TestCase):
         self.assertFalse(Lesson.objects.filter(pk=l.pk).exists())
         self.assertEqual(response2.status_code, 404)
         self.assertTrue(Lesson.objects.filter(pk=l2.pk).exists())
+
+    def test_user_can_join_the_course_with_valid_code(self):
+        course = Course.objects.create(
+            name='Bad name', description='Bad description', instructor_id=INSTRUCTOR_ID)
+        data = {"code": course.code}
+        data2 = {"code": "junk"}
+        url = "/join"
+        h = self.auth_header(USER_TOKEN)
+
+        response = client.post(url, json=data, headers=h)
+        response2 = client.post(url, json=data2, headers=h)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response2.status_code, 404)

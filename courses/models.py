@@ -1,5 +1,10 @@
 from django.db import models
 from django.core.validators import MinValueValidator
+import string
+import random
+
+
+CODE_LENGTH = 10
 
 
 class Course(models.Model):
@@ -8,9 +13,30 @@ class Course(models.Model):
     instructor_id = models.PositiveBigIntegerField(
         validators=[MinValueValidator(1)]
     )
+    code = models.CharField(max_length=CODE_LENGTH, unique=True, null=True)
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = self._generate_code()
+        super().save(*args, **kwargs)
+
+    def _generate_code(self):
+        chars = string.ascii_uppercase + string.digits
+        instructor_len = len(str(self.instructor_id))
+        if instructor_len == CODE_LENGTH:
+            raise ValueError(
+                "Too many users in the system. Increase course access maximum length")
+        while True:
+            code = ''.join(random.choices(
+                chars,
+                k=CODE_LENGTH - instructor_len
+            ))
+            code = f"{self.instructor_id}{code}"
+            if not Course.objects.filter(code=code).exists():
+                return code
 
 
 class Access(models.Model):

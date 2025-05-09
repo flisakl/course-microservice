@@ -1,5 +1,5 @@
 from django.shortcuts import get_object_or_404
-from ninja import Router, File, Form
+from ninja import Router, File, Form, Body
 from ninja.pagination import paginate
 from ninja.files import UploadedFile
 
@@ -13,7 +13,7 @@ router = Router(auth=AuthInstructor())
 api = api.API()
 
 
-@router.post("/", response={201: schemas.CourseSchema})
+@router.post("/", response={201: schemas.CourseSchemaWithCode})
 def create_course(request, data: schemas.CourseSchemaIn):
     data = data.dict()
     data['instructor_id'] = request.auth['id']
@@ -58,6 +58,17 @@ def delete_course(request, courseID: int):
     return 204, None
 
 
+@router.post("/join", response={200: dict}, auth=AuthBearer())
+def join_course(request, data   : schemas.CodeSchema):
+    obj = get_object_or_404(models.Course, code=data.code)
+    obj, created = models.Access.objects.get_or_create(
+        course=obj, user_id=request.auth['id'])
+    if not created:
+        return 200, {'detail': "You've already joined the course"}
+    else:
+        return 200, {'detail': "Success"}
+
+
 @router.post("/{int:courseID}/lessons", response={201: schemas.LessonSchemaFull})
 def create_lesson(request, courseID: int, data: Form[schemas.LessonSchemaIn], video: UploadedFile | None = File(None)):
     data = data.dict()
@@ -74,14 +85,16 @@ def create_lesson(request, courseID: int, data: Form[schemas.LessonSchemaIn], vi
 
 @router.get("/{int:courseID}/lessons", response=list[schemas.LessonSchema], auth=AuthBearer())
 def get_course_lessons(request, courseID: int):
-    get_object_or_404(models.Access, course_id=courseID, user_id=request.auth['id'])
+    get_object_or_404(models.Access, course_id=courseID,
+                      user_id=request.auth['id'])
     objs = models.Lesson.objects.filter(course_id=courseID).order_by('number')
     return objs
 
 
 @router.get("/{int:courseID}/lessons/{int:lessonID}", response=schemas.LessonSchemaFull, auth=AuthBearer())
 def get_course_lesson(request, courseID: int, lessonID: int):
-    get_object_or_404(models.Access, course_id=courseID, user_id=request.auth['id'])
+    get_object_or_404(models.Access, course_id=courseID,
+                      user_id=request.auth['id'])
     obj = get_object_or_404(models.Lesson, pk=lessonID)
     return obj
 
@@ -90,7 +103,8 @@ def get_course_lesson(request, courseID: int, lessonID: int):
 def update_lesson(request, courseID: int, lessonID: int, data: Form[schemas.LessonSchemaIn], video: UploadedFile | None = File(None)):
     data = data.dict()
     data['course_id'] = courseID
-    get_object_or_404(models.Course, pk=courseID, instructor_id=request.auth['id'])
+    get_object_or_404(models.Course, pk=courseID,
+                      instructor_id=request.auth['id'])
 
     obj = get_object_or_404(models.Lesson, pk=lessonID)
 
@@ -105,7 +119,8 @@ def update_lesson(request, courseID: int, lessonID: int, data: Form[schemas.Less
 
 @router.delete("/{int:courseID}/lessons/{int:lessonID}", response={204: None})
 def delete_lesson(request, courseID: int, lessonID: int):
-    get_object_or_404(models.Course, pk=courseID, instructor_id=request.auth['id'])
+    get_object_or_404(models.Course, pk=courseID,
+                      instructor_id=request.auth['id'])
     obj = get_object_or_404(models.Lesson, pk=lessonID)
     obj.delete()
     return 204, None

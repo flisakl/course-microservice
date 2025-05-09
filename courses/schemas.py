@@ -17,6 +17,10 @@ class CourseSchema(ModelSchema):
         fields = ['id', 'name', 'description', 'instructor_id']
 
 
+class CourseSchemaWithCode(CourseSchema):
+    code: str
+
+
 class LessonSchema(ModelSchema):
     course_id: int = 0
 
@@ -58,3 +62,7 @@ class CourseSchemaFull(ModelSchema):
     class Meta:
         model = models.Course
         fields = ['id', 'name', 'description']
+
+
+class CodeSchema(Schema):
+    code: str
