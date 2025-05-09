@@ -3,7 +3,7 @@ from ninja.testing import TestClient
 
 from courses.router import router
 from courses.api import API
-from courses.models import Course, Lesson
+from courses.models import Course, Lesson, Access
 from auth import decode_jwt
 
 client = TestClient(router)
@@ -103,12 +103,15 @@ class UserAPITests(TestCase):
         self.assertEqual(json['lessons'][1]['name'], lessons[2].name)
 
     def test_instructor_can_edit_his_course(self):
-        course = Course.objects.create(name='Bad name', description='Bad description', instructor_id=INSTRUCTOR_ID)
+        course = Course.objects.create(
+            name='Bad name', description='Bad description', instructor_id=INSTRUCTOR_ID)
         data = {'name': 'Good name', 'description': 'Good description'}
         url = f"/{course.pk}"
 
-        response = client.put(url, json=data, headers=self.auth_header(INSTRUCTOR_TOKEN))
-        response2 = client.put(url, json=data, headers=self.auth_header(USER_TOKEN))
+        response = client.put(
+            url, json=data, headers=self.auth_header(INSTRUCTOR_TOKEN))
+        response2 = client.put(
+            url, json=data, headers=self.auth_header(USER_TOKEN))
         json = response.json()
 
         self.assertEqual(response2.status_code, 401)
@@ -117,12 +120,55 @@ class UserAPITests(TestCase):
         self.assertEqual(json['description'], data['description'])
 
     def test_instructor_can_delete_his_course(self):
-        course = Course.objects.create(name='Bad name', description='Bad description', instructor_id=INSTRUCTOR_ID)
+        course = Course.objects.create(
+            name='Bad name', description='Bad description', instructor_id=INSTRUCTOR_ID)
         url = f"/{course.pk}"
 
-        response = client.delete(url, headers=self.auth_header(INSTRUCTOR_TOKEN))
+        response = client.delete(
+            url, headers=self.auth_header(INSTRUCTOR_TOKEN))
         response2 = client.delete(url, headers=self.auth_header(USER_TOKEN))
 
         self.assertEqual(response2.status_code, 401)
         self.assertEqual(response.status_code, 204)
         self.assertFalse(Course.objects.filter(pk=course.pk).exists())
+
+    def test_instructor_can_add_lesson_to_his_course(self):
+        course = Course.objects.create(
+            name='Bad name', description='Bad description', instructor_id=INSTRUCTOR_ID)
+        url = f"/{course.pk}/lessons"
+        data = {
+            "name": "First Lesson",
+            "content": "Today we're gonna talk about...",
+            "number": 1,
+        }
+        h = self.auth_header(INSTRUCTOR_TOKEN)
+
+        response = client.post(url, data=data, headers=h)
+        json = response.json()
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(json['name'], data['name'])
+        self.assertEqual(json['content'], data['content'])
+        self.assertEqual(json['number'], data['number'])
+
+    def test_user_can_access_course_lesson(self):
+        course = Course.objects.create(
+            name='Has access', description='Bad description', instructor_id=INSTRUCTOR_ID)
+        course2 = Course.objects.create(
+            name='No access', description='Bad description', instructor_id=INSTRUCTOR_ID)
+        l = Lesson.objects.create(
+            name='First lesson', content='test', course=course)
+        l2 = Lesson.objects.create(
+            name='Another lesson in different course', content='test', course=course2)
+        url = f"/{course.pk}/lessons/{l.pk}"
+        url2 = f"/{course2.pk}/lessons/{l2.pk}"
+        Access.objects.create(user_id=USER_ID, course=course)
+
+        h = self.auth_header(USER_TOKEN)
+
+        response = client.get(url, headers=h)
+        response2 = client.get(url2, headers=h)
+        json = response.json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response2.status_code, 404)
+        self.assertEqual(json['name'], 'First lesson')
