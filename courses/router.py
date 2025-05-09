@@ -84,3 +84,28 @@ def get_course_lesson(request, courseID: int, lessonID: int):
     get_object_or_404(models.Access, course_id=courseID, user_id=request.auth['id'])
     obj = get_object_or_404(models.Lesson, pk=lessonID)
     return obj
+
+
+@router.put("/{int:courseID}/lessons/{int:lessonID}", response=schemas.LessonSchemaFull)
+def update_lesson(request, courseID: int, lessonID: int, data: Form[schemas.LessonSchemaIn], video: UploadedFile | None = File(None)):
+    data = data.dict()
+    data['course_id'] = courseID
+    get_object_or_404(models.Course, pk=courseID, instructor_id=request.auth['id'])
+
+    obj = get_object_or_404(models.Lesson, pk=lessonID)
+
+    for key, value in data.items():
+        setattr(obj, key, value)
+
+    if video:
+        obj.video.save(video.name, video, save=False)
+    obj.save()
+    return obj
+
+
+@router.delete("/{int:courseID}/lessons/{int:lessonID}", response={204: None})
+def delete_lesson(request, courseID: int, lessonID: int):
+    get_object_or_404(models.Course, pk=courseID, instructor_id=request.auth['id'])
+    obj = get_object_or_404(models.Lesson, pk=lessonID)
+    obj.delete()
+    return 204, None

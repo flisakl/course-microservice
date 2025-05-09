@@ -172,3 +172,52 @@ class UserAPITests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response2.status_code, 404)
         self.assertEqual(json['name'], 'First lesson')
+
+    def test_instructor_can_edit_lesson_from_his_course(self):
+        course = Course.objects.create(
+            name='Bad name', description='Bad description', instructor_id=INSTRUCTOR_ID)
+        course2 = Course.objects.create(
+            name='Another course', description='Bad description', instructor_id=INSTRUCTOR_ID + 1)
+        l = Lesson.objects.create(
+            name='First lesson', content='test', course=course)
+        l2 = Lesson.objects.create(
+            name='Another lesson in different course', content='test', course=course2)
+        url = f"/{course.pk}/lessons/{l.pk}"
+        url2 = f"/{course2.pk}/lessons/{l2.pk}"
+        data = {
+            "name": "Corrected lesson name",
+            "content": "Fixed lesson content",
+            "number": 10,
+        }
+        h = self.auth_header(INSTRUCTOR_TOKEN)
+
+        response = client.put(url, data=data, headers=h)
+        response2 = client.put(url2, data=data, headers=h)
+        json = response.json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response2.status_code, 404)
+        self.assertEqual(json['name'], data['name'])
+        self.assertEqual(json['content'], data['content'])
+        self.assertEqual(json['number'], data['number'])
+
+    def test_instructor_can_delete_lesson_from_his_course(self):
+        course = Course.objects.create(
+            name='Bad name', description='Bad description', instructor_id=INSTRUCTOR_ID)
+        course2 = Course.objects.create(
+            name='Another course', description='Bad description', instructor_id=INSTRUCTOR_ID + 1)
+        l = Lesson.objects.create(
+            name='First lesson', content='test', course=course)
+        l2 = Lesson.objects.create(
+            name='Another lesson in different course', content='test', course=course2)
+        url = f"/{course.pk}/lessons/{l.pk}"
+        url2 = f"/{course2.pk}/lessons/{l2.pk}"
+        h = self.auth_header(INSTRUCTOR_TOKEN)
+
+        response = client.delete(url, headers=h)
+        response2 = client.delete(url2, headers=h)
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Lesson.objects.filter(pk=l.pk).exists())
+        self.assertEqual(response2.status_code, 404)
+        self.assertTrue(Lesson.objects.filter(pk=l2.pk).exists())
